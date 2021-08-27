@@ -1,0 +1,14 @@
+OBJS = GPT.cpp
+
+CC = g++
+
+INCLUDE_PATHS = -Iasio\include
+
+COMPILER_FLAGS = -w
+
+LINKER_FLAGS = -lws2_32
+
+OBJ_NAME = GPT
+
+all : $(OBJS)
+	$(CC) -g $(OBJS) $(INCLUDE_PATHS) $(COMPILER_FLAGS) $(LINKER_FLAGS) -o $(OBJ_NAME)
