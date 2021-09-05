@@ -1,4 +1,5 @@
 *.cpp~
 *.txt
 *.csv
+*.exe
 Makefile~

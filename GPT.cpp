@@ -1,53 +1,74 @@
-#include <iostream>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string>
-#include <chrono>
+#include <curl/curl.h>
 
-#ifdef _WIN32
-#define _WIN32_WINNT 0x0A00
+const int GAS_AMOUNT = 247368;
+
+struct Memory{
+  char *memory;
+  size_t size;
+};
+
+static size_t write_func(void *data, size_t size, size_t nmemb, void *userData){
+  size_t realSize = size * nmemb;
+  struct Memory *memory = (struct Memory *)userData;
+
+  char *ptr = (char*)realloc(memory->memory, memory->size + realSize + 1);
+
+  if(ptr == NULL) return 0;
+  
+
+  memory->memory = ptr;
+  memcpy(&memory->memory[memory->size], data, realSize);
+  memory->size += realSize;
+  memory->memory[memory->size] = 0;
+  
+  return realSize;
+}
+
+int main(void){
+  CURL *curl;
+  CURLcode res;
+
+  struct Memory readBuffer;
+  readBuffer.memory = NULL;
+  readBuffer.size = 0;
+
+  curl_global_init(CURL_GLOBAL_ALL);
+
+  curl = curl_easy_init();
+  if(curl){
+    //Formula = GAS_AMOUNT * gas_price(fast) * 0.00038;
+    curl_easy_setopt(curl, CURLOPT_URL, "https://ethgasstation.info/api/ethgasAPI.json?api-key=XXAPI_5066e2e6a0daf2d96488adb42823c0604e915ffc3ee9123fbe0066ba2cd7");
+
+    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0);
+
+#ifdef SKIP_PEER_VERIFICATION
+    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
 #endif
-#define ASIO_STANDALONE
-#include <asio.hpp>
-#include <asio/ts/buffer.hpp>
-#include <asio/ts/internet.hpp>
 
-int main(){
-  asio::error_code ec;
+#ifdef SKIP_HOSTNAME_VERIFICATION
+    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
+#endif
 
-  asio::io_context context;
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_func);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &readBuffer);
+    
+    res = curl_easy_perform(curl);
+    
 
-  asio::ip::tcp::endpoint endpoint(asio::ip::make_address("76.76.21.21", ec), 80);
-
-  asio::ip::tcp::socket socket(context);
-
-  socket.connect(endpoint);
-
-  if(!ec){
-    std::cout << "Connected!" << std::endl;
-  } else {
-    std::cout << "Failed to connect to address:\n" << ec.message() << std::endl;
-  }
-
-  if(socket.is_open()){
-    std::string request = "GET /index.html HTTP/1.1\r\n"
-      "Host: gas.metasync.app\r\n"
-      "Connection: close\r\n\r\n";
-
-    socket.write_some(asio::buffer(request.data(), request.size()), ec);
-
-    using namespace std::chrono_literals;
-    std::this_thread::sleep_for(20000ms);
-
-    size_t bytes = socket.available();
-    std::cout << "Bytes available: " << bytes << std::endl;
-
-    if(bytes > 0){
-      std::vector<char> buffer(bytes);
-      socket.read_some(asio::buffer(buffer.data(), buffer.size()), ec);
-
-      for(auto c : buffer)
-	std::cout << c;
+    if(res != CURLE_OK){
+      fprintf(stderr, "curl_easy_perform() returned %s\n", curl_easy_strerror(res));
     }
+    printf("%s\n", readBuffer.memory);
+    
+    curl_easy_cleanup(curl);
+
+    free(readBuffer.memory);
   }
+
+  curl_global_cleanup();
 
   system("PAUSE");
   return 0;
