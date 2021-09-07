@@ -1,9 +1,14 @@
-#include <stdio.h>
 #include <stdlib.h>
 #include <string>
+#include <vector>
+#include <iostream>
+#include <fstream>
+#include <chrono>
+#include <ctime>
 #include <curl/curl.h>
 
-const int GAS_AMOUNT = 247368;
+const int GAS_AMOUNT = 2600;
+const float gwei_price = 0.00039;
 
 struct Memory{
   char *memory;
@@ -40,7 +45,8 @@ int main(void){
   curl = curl_easy_init();
   if(curl){
     //Formula = GAS_AMOUNT * gas_price(fast) * 0.00038;
-    curl_easy_setopt(curl, CURLOPT_URL, "https://ethgasstation.info/api/ethgasAPI.json?api-key=XXAPI_5066e2e6a0daf2d96488adb42823c0604e915ffc3ee9123fbe0066ba2cd7");
+    //curl_easy_setopt(curl, CURLOPT_URL, "https://ethgasstation.info/api/ethgasAPI.json?api-key=XXAPI_5066e2e6a0daf2d96488adb42823c0604e915ffc3ee9123fbe0066ba2cd7");
+    curl_easy_setopt(curl, CURLOPT_URL, "https://api.etherscan.io/api?module=gastracker&action=gasoracle&apikey=GAH5FN7VVG2365XEMCP5DUHG62BZF54D99");
 
     curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0);
 
@@ -54,7 +60,7 @@ int main(void){
 
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_func);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &readBuffer);
-    
+
     res = curl_easy_perform(curl);
     
 
@@ -62,6 +68,41 @@ int main(void){
       fprintf(stderr, "curl_easy_perform() returned %s\n", curl_easy_strerror(res));
     }
     printf("%s\n", readBuffer.memory);
+
+    int index;
+
+    for(int i = 0; i < readBuffer.size; i++){
+      if(readBuffer.memory[i] == 'F'){
+	index = i;
+	break;
+      }
+    }
+
+    index += 15;
+
+    std::vector<char> charBuf;
+    for(int j = index; j < readBuffer.size; j++){
+      if(readBuffer.memory[j] != '"'){
+	charBuf.push_back(readBuffer.memory[j]);
+      } else {
+	break;
+      }
+    }
+
+    std::string fastPrice(charBuf.begin(), charBuf.end());
+    std::cout << fastPrice << std::endl;
+    int price = std::stoi(fastPrice) * GAS_AMOUNT * gwei_price;
+    std::cout << price << "$" << std::endl;
+
+    std::ofstream out("result.csv", std::ios::app);
+
+    auto bn = std::chrono::system_clock::now();
+
+    std::time_t time = std::chrono::system_clock::to_time_t(bn);
+    
+    out << std::ctime(&time) << "," << price << std::endl;
+
+    out.close();
     
     curl_easy_cleanup(curl);
 
